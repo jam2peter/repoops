@@ -56,6 +56,7 @@ class RepositoryAdminTests(unittest.TestCase):
     def test_create_public_repository(self):
         api = FakeRest([
             (404, {"message": "Not Found"}),
+            (200, {"login": "example-owner"}),
             (
                 201,
                 {
@@ -73,7 +74,23 @@ class RepositoryAdminTests(unittest.TestCase):
         )
         self.assertTrue(result["ok"])
         self.assertTrue(result["created"])
-        self.assertFalse(api.calls[1][2]["private"])
+        self.assertEqual(api.calls[1][0], "https://api.github.com/user")
+        self.assertFalse(api.calls[2][2]["private"])
+
+    def test_authenticated_user_must_match_configured_owner(self):
+        api = FakeRest([
+            (404, {"message": "Not Found"}),
+            (200, {"login": "different-user"}),
+        ])
+        result = provision(
+            CFG,
+            "OWNER",
+            parse_command("/repoops repo create demo public"),
+            api,
+        )
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "authenticated_user_owner_mismatch")
+        self.assertEqual(len(api.calls), 2)
 
     def test_existing_repository_is_idempotent(self):
         api = FakeRest([
