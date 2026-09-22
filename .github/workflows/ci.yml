@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Python
+        run: python3 -m py_compile scripts/repo_admin.py scripts/project_sync.py scripts/install.py
+
+      - name: Validate example config
+        run: python3 -m json.tool repoops.example.json >/dev/null
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Sanitization scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE 'JamPeter-Infrastructure|Laboratório JamPeter|PROJECTS_TOKEN|lab\.jampeter\.com\.br|192\.168\.' \
+            --exclude-dir=.git --exclude=ci.yml .
+          ! grep -RInE '(ghp_|github_pat_|AIza[0-9A-Za-z_-]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY)' \
+            --exclude-dir=.git --exclude=ci.yml .
