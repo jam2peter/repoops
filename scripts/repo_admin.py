@@ -119,11 +119,30 @@ def provision(
     if status == 200:
         result = existing
     elif status == 404:
-        endpoint = (
-            "https://api.github.com/user/repos"
-            if owner_type == "user"
-            else f"https://api.github.com/orgs/{owner}/repos"
-        )
+        if owner_type == "user":
+            identity_status, identity = api.request("https://api.github.com/user")
+            if identity_status != 200:
+                return {
+                    "ok": False,
+                    "error": "authenticated_user_lookup_failed",
+                    "http_status": identity_status,
+                    "repository": command.name,
+                    "visibility": command.visibility,
+                }
+            authenticated_login = str(identity.get("login", "")).strip()
+            if authenticated_login.casefold() != owner.casefold():
+                return {
+                    "ok": False,
+                    "error": "authenticated_user_owner_mismatch",
+                    "repository": command.name,
+                    "configured_owner": owner,
+                    "authenticated_owner": authenticated_login,
+                    "visibility": command.visibility,
+                }
+            endpoint = "https://api.github.com/user/repos"
+        else:
+            endpoint = f"https://api.github.com/orgs/{owner}/repos"
+
         payload = {
             "name": command.name,
             "description": str(cfg.get("default_description", "Managed by RepoOps")),
