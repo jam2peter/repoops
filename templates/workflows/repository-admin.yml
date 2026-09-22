@@ -1,0 +1,73 @@
+name: RepoOps Repository Admin
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  repository-admin:
+    if: >-
+      github.event.issue.pull_request == null &&
+      startsWith(github.event.comment.body, '/repoops repo create ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REPOOPS_TOKEN: ${{ secrets.REPOOPS_TOKEN }}
+      REPOOPS_CONFIG: ${{ vars.REPOOPS_CONFIG || 'repoops.json' }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
+      AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      SOURCE_REPO: ${{ github.repository }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${REPOOPS_TOKEN:-}" || {
+            echo "REPOOPS_TOKEN is not configured"
+            exit 1
+          }
+
+      - name: Execute constrained repository operation
+        id: provision
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/repo_admin.py             --config "$REPOOPS_CONFIG"             --comment "$COMMENT_BODY"             --association "$AUTHOR_ASSOCIATION" > result.json
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Record sanitized result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > result-comment.txt
+          import json
+          d = json.load(open("result.json", encoding="utf-8"))
+          rows = [
+              "REPOOPS_REPOSITORY_ADMIN=" + ("PASS" if d.get("ok") else "FAIL"),
+              "REPOSITORY=" + str(d.get("full_name") or d.get("repository") or ""),
+              "CREATED=" + ("yes" if d.get("created") else "no"),
+              "VISIBILITY=" + str(d.get("visibility") or d.get("actual_visibility") or ""),
+              "URL=" + str(d.get("url") or ""),
+              "ERROR=" + str(d.get("error") or ""),
+              "SECRET_EXPOSED=NO",
+          ]
+          print("\n".join(rows))
+          PY
+          gh issue comment "$ISSUE_NUMBER" --repo "$SOURCE_REPO" --body-file result-comment.txt
+
+      - name: Enforce operation result
+        if: steps.provision.outputs.rc != '0'
+        shell: bash
+        run: exit 1

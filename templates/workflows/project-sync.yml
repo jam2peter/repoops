@@ -1,0 +1,36 @@
+name: RepoOps Project Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+
+concurrency:
+  group: repoops-project-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REPOOPS_TOKEN: ${{ secrets.REPOOPS_TOKEN }}
+      REPOOPS_CONFIG: ${{ vars.REPOOPS_CONFIG || 'repoops.json' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${REPOOPS_TOKEN:-}" || {
+            echo "REPOOPS_TOKEN is not configured"
+            exit 1
+          }
+
+      - name: Reconcile configured repositories into Project V2
+        run: python3 scripts/project_sync.py --config "$REPOOPS_CONFIG"
