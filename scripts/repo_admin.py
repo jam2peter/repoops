@@ -14,11 +14,10 @@ import argparse
 import json
 import os
 import re
-import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, NoReturn, Protocol
 
 COMMAND_RE = re.compile(
     r"/repoops repo create ([A-Za-z0-9._-]{1,100}) (private|public)"

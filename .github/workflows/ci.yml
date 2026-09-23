@@ -15,6 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: JamPeter Quality Gate
+        uses: jam2peter/quality-gate@v0
+        with:
+          config: .jampeter/quality-gate.toml
+          install-tools: ruff
+
       - name: Compile Python
         run: python3 -m py_compile scripts/repo_admin.py scripts/project_sync.py scripts/install.py
 
