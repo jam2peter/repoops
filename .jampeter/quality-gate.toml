@@ -1,0 +1,42 @@
+version = 1
+profile = "repoops-python"
+
+[report]
+path = ".quality-gate/report.json"
+
+[[gate]]
+id = "format"
+phase = "format"
+command = "ruff format --check scripts tests"
+required = false
+safe_fix = "ruff format scripts tests"
+
+[[gate]]
+id = "complexity"
+phase = "clean"
+command = "ruff check scripts tests --select C90"
+required = false
+
+[[gate]]
+id = "lint-critical"
+phase = "lint"
+command = "ruff check scripts tests --select E4,E7,E9,F"
+required = true
+
+[[gate]]
+id = "compile"
+phase = "type"
+command = "python3 -m compileall -q scripts tests"
+required = true
+
+[[gate]]
+id = "tests"
+phase = "test"
+command = "python3 -m unittest discover -s tests -p 'test_*.py' -v"
+required = true
+
+[[gate]]
+id = "config"
+phase = "build"
+command = "python3 -m json.tool repoops.example.json >/dev/null"
+required = true
